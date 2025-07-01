@@ -212,14 +212,4 @@ user@example.com,2024-01-15,Food,8.7,mock_iot
 
 This project is open source and available under the MIT License.
 
-## Support
-
-For issues or questions:
-1. Check the troubleshooting section
-2. Review the code comments
-3. Create an issue in the repository
-4. Contact the development team
-
----
-
 **Happy Carbon Tracking! 🌱** 
