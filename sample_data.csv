@@ -1,0 +1,13 @@
+email,date,activity_type,emission_kgco2e,source
+user@example.com,2024-01-15,Travel,25.5,mock_iot
+user@example.com,2024-01-15,Electricity,12.3,mock_iot
+user@example.com,2024-01-15,Food,8.7,mock_iot
+user@example.com,2024-01-16,Travel,18.2,mock_iot
+user@example.com,2024-01-16,Electricity,15.1,mock_iot
+user@example.com,2024-01-16,Food,6.4,mock_iot
+user@example.com,2024-01-17,Travel,22.8,mock_iot
+user@example.com,2024-01-17,Electricity,11.7,mock_iot
+user@example.com,2024-01-17,Food,9.2,mock_iot
+user@example.com,2024-01-18,Travel,19.5,mock_iot
+user@example.com,2024-01-18,Electricity,13.8,mock_iot
+user@example.com,2024-01-18,Food,7.1,mock_iot 

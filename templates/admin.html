@@ -1,0 +1,222 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Panel - Carbon Tracker{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="text-white mb-0">
+                <i class="fas fa-cog me-2"></i>Admin Panel
+            </h1>
+            <div class="text-white">
+                <i class="fas fa-user-shield me-1"></i>
+                Administrator Dashboard
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Stats Cards -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="stats-card">
+            <div class="stats-number">{{ users|length }}</div>
+            <div class="stats-label">Total Users</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stats-card">
+            <div class="stats-number">{{ emissions|length }}</div>
+            <div class="stats-label">Total Emissions</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stats-card">
+            <div class="stats-number">{{ mock_data_count }}</div>
+            <div class="stats-label">Mock IoT Entries</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stats-card">
+            <div class="stats-number">
+                {% set total_emissions = emissions|sum(attribute='emission_kgco2e') %}
+                {{ "%.1f"|format(total_emissions) }}
+            </div>
+            <div class="stats-label">Total CO2 (kg)</div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- CSV Upload -->
+    <div class="col-lg-6">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-upload me-2"></i>Upload Mock CSV Data</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('upload_csv') }}" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="csv_file" class="form-label">Select CSV File</label>
+                        <input type="file" class="form-control" id="csv_file" name="csv_file" accept=".csv" required>
+                        <small class="text-muted">
+                            CSV format: email,date,activity_type,emission_kgco2e,source
+                        </small>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-upload me-2"></i>Upload CSV
+                    </button>
+                </form>
+                
+                <hr>
+                
+                <h6>Sample CSV Format:</h6>
+                <div class="bg-light p-3 rounded">
+                    <code>
+                        email,date,activity_type,emission_kgco2e,source<br>
+                        user@example.com,2024-01-15,Travel,25.5,mock_iot<br>
+                        user@example.com,2024-01-15,Electricity,12.3,mock_iot<br>
+                        user@example.com,2024-01-15,Food,8.7,mock_iot
+                    </code>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Manual Mock Data -->
+    <div class="col-lg-6">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-plus me-2"></i>Add Manual Mock Data</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('add_mock_data') }}">
+                    <div class="mb-3">
+                        <label for="user_id" class="form-label">Select User</label>
+                        <select class="form-select" id="user_id" name="user_id" required>
+                            <option value="">Choose user...</option>
+                            {% for user in users %}
+                                {% if user.role == 'user' %}
+                                    <option value="{{ user.id }}">{{ user.full_name }} ({{ user.email }})</option>
+                                {% endif %}
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="activity_type" class="form-label">Activity Type</label>
+                        <select class="form-select" id="activity_type" name="activity_type" required>
+                            <option value="">Select activity...</option>
+                            <option value="Travel">Travel</option>
+                            <option value="Electricity">Electricity</option>
+                            <option value="Food">Food</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="emission_kgco2e" class="form-label">CO2 Emissions (kg)</label>
+                        <input type="number" class="form-control" id="emission_kgco2e" name="emission_kgco2e" 
+                               step="0.1" min="0" required>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-plus me-2"></i>Add Mock Data
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Users Table -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="fas fa-users me-2"></i>All Users</h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Role</th>
+                        <th>Carbon Limit</th>
+                        <th>Registered</th>
+                        <th>Total Emissions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    <tr>
+                        <td>{{ user.full_name }}</td>
+                        <td>{{ user.email }}</td>
+                        <td>
+                            <span class="badge bg-{{ 'danger' if user.role == 'admin' else 'primary' }}">
+                                {{ user.role }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if user.carbon_limit %}
+                                {{ "%.1f"|format(user.carbon_limit) }} kg
+                            {% else %}
+                                <span class="text-muted">Not set</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ user.registered_at.strftime('%Y-%m-%d') }}</td>
+                        <td>
+                            {% set user_emissions = emissions|selectattr('user_id', 'equalto', user.id)|list %}
+                            {% set total = user_emissions|sum(attribute='emission_kgco2e') %}
+                            {{ "%.1f"|format(total) }} kg
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Emissions -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="fas fa-chart-line me-2"></i>Recent Emissions</h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>User</th>
+                        <th>Date</th>
+                        <th>Activity</th>
+                        <th>CO2 (kg)</th>
+                        <th>Source</th>
+                        <th>Created</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for emission in emissions[-20:]|reverse %}
+                    <tr>
+                        <td>{{ emission.user.full_name }}</td>
+                        <td>{{ emission.date.strftime('%Y-%m-%d') }}</td>
+                        <td>
+                            <span class="badge bg-info">{{ emission.activity_type }}</span>
+                        </td>
+                        <td>{{ "%.1f"|format(emission.emission_kgco2e) }}</td>
+                        <td>
+                            <span class="badge bg-{{ 'warning' if emission.source == 'mock_iot' else 'secondary' }}">
+                                {{ emission.source }}
+                            </span>
+                        </td>
+                        <td>{{ emission.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %} 

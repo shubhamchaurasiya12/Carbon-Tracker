@@ -1,0 +1,265 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Carbon Tracker{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="text-white mb-0">
+                <i class="fas fa-chart-line me-2"></i>Welcome, {{ current_user.full_name }}!
+            </h1>
+            <div class="text-white">
+                <i class="fas fa-calendar me-1"></i>
+                {{ now.strftime('%B %Y') }}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Carbon Limit Warning -->
+{% if limit_exceeded %}
+<div class="limit-warning">
+    <div class="d-flex align-items-center">
+        <i class="fas fa-exclamation-triangle me-3" style="font-size: 2rem;"></i>
+        <div>
+            <h4 class="mb-1">Carbon Limit Exceeded!</h4>
+            <p class="mb-0">You've exceeded your monthly carbon limit of {{ current_user.carbon_limit }} kg CO2e. Consider reducing your emissions.</p>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Stats Cards -->
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="stats-card">
+            <div class="stats-number">{{ "%.1f"|format(total_emissions) }}</div>
+            <div class="stats-label">Total CO2 (kg) This Month</div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="stats-card">
+            <div class="stats-number">{{ current_user.carbon_limit or 'Not Set' }}</div>
+            <div class="stats-label">Monthly Limit (kg CO2e)</div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="stats-card">
+            <div class="stats-number">
+                {% if current_user.carbon_limit %}
+                    {{ "%.1f"|format((total_emissions / current_user.carbon_limit * 100)) }}%
+                {% else %}
+                    N/A
+                {% endif %}
+            </div>
+            <div class="stats-label">Limit Usage</div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Charts -->
+    <div class="col-lg-8">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Daily Emissions</h5>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="dailyChart"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-chart-pie me-2"></i>Emission Breakdown</h5>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="categoryChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Sidebar -->
+    <div class="col-lg-4">
+        <!-- Add Emission Entry -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-plus me-2"></i>Add Today's Entry</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('add_emission') }}">
+                    <div class="mb-3">
+                        <label for="activity_type" class="form-label">Activity Type</label>
+                        <select class="form-select" id="activity_type" name="activity_type" required>
+                            <option value="">Select activity...</option>
+                            <option value="Travel">Travel</option>
+                            <option value="Electricity">Electricity</option>
+                            <option value="Food">Food</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="emission_kgco2e" class="form-label">CO2 Emissions (kg)</label>
+                        <input type="number" class="form-control" id="emission_kgco2e" name="emission_kgco2e" 
+                               step="0.1" min="0" required>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-save me-2"></i>Save Entry
+                    </button>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Update Carbon Limit -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-cog me-2"></i>Update Carbon Limit</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('update_limit') }}">
+                    <div class="mb-3">
+                        <label for="carbon_limit" class="form-label">Monthly Limit (kg CO2e)</label>
+                        <input type="number" class="form-control" id="carbon_limit" name="carbon_limit" 
+                               value="{{ current_user.carbon_limit or '' }}" step="0.1" min="0">
+                    </div>
+                    
+                    <button type="submit" class="btn btn-outline-primary w-100">
+                        <i class="fas fa-edit me-2"></i>Update Limit
+                    </button>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Category Breakdown -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-list me-2"></i>Category Summary</h5>
+            </div>
+            <div class="card-body">
+                {% for category, amount in category_breakdown.items() %}
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="fw-bold">{{ category }}</span>
+                    <span class="badge bg-primary">{{ "%.1f"|format(amount) }} kg</span>
+                </div>
+                {% else %}
+                <p class="text-muted mb-0">No emissions recorded this month.</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- @ts-nocheck -->
+<script>
+// Chart data from Flask
+// @ts-ignore - Template variables from Jinja2
+const dailyData = {{ daily_emissions | tojson }};
+// @ts-ignore - Template variables from Jinja2
+const categoryData = {{ category_breakdown | tojson }};
+
+// Daily Emissions Chart
+const dailyCtx = document.getElementById('dailyChart').getContext('2d');
+const dailyChart = new Chart(dailyCtx, {
+    type: 'bar',
+    data: {
+        labels: Object.keys(dailyData),
+        datasets: [{
+            label: 'Daily CO2 Emissions (kg)',
+            data: Object.values(dailyData),
+            backgroundColor: 'rgba(46, 204, 113, 0.8)',
+            borderColor: 'rgba(46, 204, 113, 1)',
+            borderWidth: 2
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+            y: {
+                beginAtZero: true,
+                title: {
+                    display: true,
+                    text: 'CO2 Emissions (kg)'
+                }
+            },
+            x: {
+                title: {
+                    display: true,
+                    text: 'Date'
+                }
+            }
+        },
+        plugins: {
+            legend: {
+                display: false
+            }
+        }
+    }
+});
+
+// Category Breakdown Chart
+const categoryCtx = document.getElementById('categoryChart').getContext('2d');
+const categoryChart = new Chart(categoryCtx, {
+    type: 'doughnut',
+    data: {
+        labels: Object.keys(categoryData),
+        datasets: [{
+            data: Object.values(categoryData),
+            backgroundColor: [
+                'rgba(46, 204, 113, 0.8)',
+                'rgba(52, 152, 219, 0.8)',
+                'rgba(155, 89, 182, 0.8)',
+                'rgba(241, 196, 15, 0.8)',
+                'rgba(231, 76, 60, 0.8)'
+            ],
+            borderWidth: 2,
+            borderColor: '#fff'
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'bottom'
+            }
+        }
+    }
+});
+
+// Auto-refresh dashboard every 30 seconds
+setInterval(function() {
+    fetch('/api/dashboard_data')
+        .then(response => response.json())
+        .then(data => {
+            // Update stats
+            document.querySelector('.stats-number').textContent = data.total_emissions.toFixed(1);
+            
+            // Update charts
+            dailyChart.data.labels = Object.keys(data.daily_emissions);
+            dailyChart.data.datasets[0].data = Object.values(data.daily_emissions);
+            dailyChart.update();
+            
+            categoryChart.data.labels = Object.keys(data.category_breakdown);
+            categoryChart.data.datasets[0].data = Object.values(data.category_breakdown);
+            categoryChart.update();
+            
+            // Update limit warning
+            if (data.limit_exceeded) {
+                if (!document.querySelector('.limit-warning')) {
+                    location.reload(); // Reload to show warning
+                }
+            }
+        })
+        .catch(error => console.error('Error updating dashboard:', error));
+}, 30000);
+</script>
+{% endblock %} 
